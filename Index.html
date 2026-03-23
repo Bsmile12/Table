@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ออกแบบตารางเรียน</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Mitr:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* ===== THEME CSS VARS — injected by JS ===== */
+:root {
+  --bg:#fdf6ff; --surface:#fff; --accent:#c084fc; --text:#3b1a5a;
+  --muted:#9d6ab8; --border:#e9d5ff; --shadow:0 4px 24px rgba(192,132,252,0.13);
+  --radius:18px;
+  --topbar-a:#7c3aed; --topbar-b:#f0abfc;
+  --day-bg:linear-gradient(135deg,#f3e8ff,#ede9fe);
+  --day-color:#6d28d9; --th-bg:#faf5ff;
+  --hover-cell:rgba(192,132,252,0.08); --drag-bg:rgba(124,58,237,0.12);
+  --wheel-angle:0deg;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .35s,color .35s}
+
+/* ===== LAYOUT ===== */
+.app{display:grid;grid-template-columns:310px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+.topbar{grid-column:1/-1;padding:15px 26px;background:linear-gradient(135deg,var(–topbar-a),var(–topbar-b));display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 20px rgba(0,0,0,0.14)}
+.topbar h1{font-family:‘Mitr’,sans-serif;font-size:1.45rem;font-weight:600;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,0.18)}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+.btn{font-family:‘Sarabun’,sans-serif;font-size:0.84rem;font-weight:600;padding:7px 15px;border-radius:50px;border:none;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:5px}
+.btn-white{background:#fff;color:var(–topbar-a)}
+.btn-white:hover{background:#f3e8ff;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.12)}
+.btn-ghost{background:rgba(255,255,255,0.18);color:#fff;border:1.5px solid rgba(255,255,255,0.38)}
+.btn-ghost:hover{background:rgba(255,255,255,0.28)}
+
+/* ===== SIDEBAR ===== */
+.sidebar{background:var(–surface);border-right:1.5px solid var(–border);padding:14px 13px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;transition:background .35s,border-color .35s}
+.panel{background:var(–bg);border:1.5px solid var(–border);border-radius:var(–radius);padding:12px 13px 14px;transition:background .35s,border-color .35s}
+.panel-title{font-family:‘Mitr’,sans-serif;font-size:0.78rem;font-weight:500;color:var(–muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.form-group{margin-bottom:8px}
+.form-label{font-size:0.77rem;font-weight:600;color:var(–muted);margin-bottom:3px;display:block}
+.form-input{width:100%;padding:7px 10px;border:1.5px solid var(–border);border-radius:10px;font-family:‘Sarabun’,sans-serif;font-size:0.85rem;color:var(–text);background:var(–surface);transition:border-color .2s,box-shadow .2s;outline:none}
+.form-input:focus{border-color:var(–accent);box-shadow:0 0 0 3px rgba(192,132,252,.14)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.add-btn{width:100%;padding:9px;background:linear-gradient(135deg,var(–topbar-a),var(–accent));color:#fff;border:none;border-radius:12px;font-family:‘Sarabun’,sans-serif;font-size:0.87rem;font-weight:600;cursor:pointer;transition:all .2s;margin-top:4px}
+.add-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.2)}
+
+/* color palette */
+.color-palette{display:flex;flex-wrap:wrap;gap:6px}
+.color-swatch{width:27px;height:27px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .15s}
+.color-swatch:hover{transform:scale(1.18)}
+.color-swatch.active{border-color:var(–text);box-shadow:0 0 0 2px var(–accent)}
+.custom-color-btn{width:27px;height:27px;border-radius:50%;border:2.5px dashed var(–accent);background:transparent;cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;color:var(–accent);transition:all .15s}
+.custom-color-btn:hover{background:rgba(192,132,252,.1)}
+#customColorInput{display:none}
+
+/* stickers */
+.sticker-grid{display:flex;flex-wrap:wrap;gap:4px}
+.sticker-item{font-size:1.35rem;cursor:pointer;padding:3px 5px;border-radius:8px;border:2px solid transparent;transition:all .15s;user-select:none}
+.sticker-item:hover{background:rgba(192,132,252,.1);transform:scale(1.18)}
+.sticker-item.active{border-color:var(–accent);background:rgba(192,132,252,.1)}
+
+/* settings */
+.settings-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.settings-label{font-size:.81rem;color:var(–text)}
+.settings-input{padding:5px 6px;border:1.5px solid var(–border);border-radius:8px;font-family:‘Sarabun’,sans-serif;font-size:.81rem;text-align:center;outline:none;background:var(–surface);color:var(–text)}
+.settings-input:focus{border-color:var(–accent)}
+
+/* day checks */
+.day-checks{display:flex;flex-wrap:wrap;gap:5px}
+.day-check-label{display:flex;align-items:center;gap:3px;font-size:.74rem;font-weight:600;cursor:pointer;padding:3px 8px;border-radius:50px;border:1.5px solid var(–border);transition:all .15s;user-select:none;background:var(–surface);color:var(–muted)}
+.day-check-label input{display:none}
+.day-check-label.checked{background:var(–accent);border-color:var(–accent);color:#fff}
+.section-divider{height:1px;background:var(–border);margin:8px 0}
+
+/* ============ COLOR WHEEL PANEL ============ */
+.wheel-container{display:flex;flex-direction:column;align-items:center;gap:12px}
+.wheel-wrap{position:relative;width:180px;height:180px;cursor:pointer;flex-shrink:0}
+canvas#colorWheel{border-radius:50%;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.12)}
+.wheel-pointer{position:absolute;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);transform:translate(-50%,-50%);pointer-events:none;transition:left .15s,top .15s}
+
+/* Theme presets strip */
+.theme-strip{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.theme-dot{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .18s;position:relative;flex-shrink:0}
+.theme-dot:hover{transform:scale(1.18)}
+.theme-dot.active{border-color:var(–text);box-shadow:0 0 0 2px rgba(0,0,0,.18)}
+.theme-dot .theme-dot-inner{position:absolute;inset:3px;border-radius:50%}
+.wheel-brightness{display:flex;align-items:center;gap:8px;width:100%}
+.wheel-brightness label{font-size:.75rem;color:var(–muted);white-space:nowrap}
+.wheel-brightness input[type=range]{flex:1;accent-color:var(–accent);height:4px;cursor:pointer}
+.current-theme-preview{width:100%;padding:8px 12px;border-radius:12px;border:1.5px solid var(–border);background:linear-gradient(135deg,var(–topbar-a),var(–topbar-b));display:flex;align-items:center;gap:8px;color:#fff;font-size:.8rem;font-weight:600}
+.preview-swatch{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.5)}
+
+/* ===== MAIN ===== */
+.main{padding:18px 22px;overflow:auto;background:var(–bg);transition:background .35s}
+
+/* ===== TIMETABLE ===== */
+.timetable-wrap{background:var(–surface);border-radius:20px;box-shadow:var(–shadow);overflow:hidden;border:1.5px solid var(–border);transition:all .35s}
+.table-header-bar{padding:13px 18px 11px;display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid var(–border)}
+.table-title-input{font-family:‘Mitr’,sans-serif;font-size:1.1rem;font-weight:500;color:var(–text);border:none;outline:none;background:transparent;width:270px}
+.semester-badge{font-size:.76rem;font-weight:600;padding:4px 12px;border-radius:50px;background:linear-gradient(135deg,color-mix(in srgb,var(–topbar-a) 10%,white),color-mix(in srgb,var(–topbar-b) 15%,white));color:var(–topbar-a);border:1.5px solid var(–border)}
+.timetable-grid-wrapper{overflow-x:auto}
+table.timetable{width:100%;border-collapse:collapse}
+table.timetable th,table.timetable td{border:1px solid var(–border);text-align:center;vertical-align:middle;padding:0}
+table.timetable th.day-col{width:80px;min-width:68px;font-family:‘Mitr’,sans-serif;font-size:.85rem;font-weight:500;color:var(–day-color);background:var(–day-bg);padding:9px 5px;white-space:nowrap}
+table.timetable th.time-header{font-size:.68rem;font-weight:600;color:var(–muted);background:var(–th-bg);padding:7px 5px;text-align:center;min-width:106px}
+table.timetable td.time-slot{height:74px;min-width:106px;position:relative;cursor:pointer;transition:background .12s}
+table.timetable td.time-slot:hover .cell-hover-btn{opacity:1}
+table.timetable td.time-slot.drag-over{background:var(–drag-bg)!important;outline:2px dashed var(–accent);outline-offset:-2px}
+.cell-hover-btn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(–hover-cell);opacity:0;transition:opacity .12s;font-size:1.2rem;color:var(–accent);pointer-events:none}
+
+/* subject card */
+.subject-card{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 6px;position:relative;overflow:hidden;cursor:grab}
+.subject-card:active{cursor:grabbing}
+.subject-card.dragging{opacity:.4}
+.sticker-overlay{position:absolute;top:3px;right:5px;font-size:.92rem;pointer-events:none}
+.subj-code{font-size:.58rem;font-weight:700;letter-spacing:.06em;opacity:.7;margin-bottom:1px}
+.subj-name{font-family:‘Mitr’,sans-serif;font-size:.79rem;font-weight:500;line-height:1.25;text-align:center;word-break:break-word}
+.subj-teacher{font-size:.63rem;opacity:.65;margin-top:2px}
+.delete-cell-btn{position:absolute;top:2px;left:3px;font-size:.6rem;opacity:0;cursor:pointer;background:rgba(255,255,255,.75);border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#e11d48;transition:opacity .12s;border:none}
+.subject-card:hover .delete-cell-btn{opacity:1}
+
+/* tooltip */
+.tt{position:fixed;z-index:200;background:var(–surface);border:1.5px solid var(–border);border-radius:14px;padding:10px 13px;min-width:156px;max-width:216px;box-shadow:0 8px 28px rgba(0,0,0,.13);pointer-events:none;font-size:.81rem;transition:opacity .12s;opacity:0}
+.tt.show{opacity:1}
+.tt-name{font-family:‘Mitr’,sans-serif;font-size:.93rem;font-weight:600;margin-bottom:4px}
+.tt-row{display:flex;gap:6px;align-items:center;color:var(–muted);margin-top:3px}
+
+/* stats */
+.stats-panel{margin-top:14px;background:var(–surface);border-radius:20px;border:1.5px solid var(–border);padding:14px 18px;box-shadow:var(–shadow)}
+.stats-title{font-family:‘Mitr’,sans-serif;font-size:.93rem;font-weight:600;color:var(–text);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.stats-grid{display:flex;flex-wrap:wrap;gap:8px}
+.stat-card{background:var(–bg);border:1.5px solid var(–border);border-radius:12px;padding:9px 13px;flex:1;min-width:125px}
+.stat-subj{font-family:‘Mitr’,sans-serif;font-size:.83rem;font-weight:500;margin-bottom:3px;display:flex;align-items:center;gap:5px}
+.stat-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.stat-hours{font-size:1.25rem;font-weight:700;line-height:1}
+.stat-unit{font-size:.68rem;color:var(–muted);margin-top:2px}
+.stat-total{border-color:var(–accent);background:color-mix(in srgb,var(–accent) 8%,var(–bg))}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;padding:0 2px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:.73rem;background:var(–surface);border:1.5px solid var(–border);border-radius:50px;padding:3px 9px;cursor:pointer;transition:all .12s}
+.legend-item:hover{border-color:var(–accent)}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.32);backdrop-filter:blur(3px);z-index:100;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(–surface);border-radius:22px;padding:22px 22px 18px;width:375px;box-shadow:0 20px 60px rgba(0,0,0,.18);animation:slideUp .2s;border:1.5px solid var(–border)}
+@keyframes slideUp{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal h2{font-family:‘Mitr’,sans-serif;font-size:1.03rem;font-weight:600;color:var(–text);margin-bottom:13px;display:flex;align-items:center;gap:8px}
+.modal-close{margin-left:auto;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(–muted)}
+.modal-footer{display:flex;gap:8px;margin-top:15px}
+.modal-footer .btn{flex:1;justify-content:center;padding:9px}
+.btn-primary{background:linear-gradient(135deg,var(–topbar-a),var(–accent));color:#fff;border:none}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.btn-secondary{background:var(–bg);color:var(–text);border:1.5px solid var(–border)}
+.btn-secondary:hover{background:rgba(192,132,252,.08)}
+.modal-stickers{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.modal-sticker-btn{font-size:1.25rem;padding:3px 5px;cursor:pointer;border-radius:8px;border:2px solid transparent;background:none;transition:all .12s}
+.modal-sticker-btn:hover{background:rgba(192,132,252,.1);transform:scale(1.15)}
+.modal-sticker-btn.active{border-color:var(–accent);background:rgba(192,132,252,.1)}
+
+/* toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(–text);color:var(–bg);padding:9px 20px;border-radius:50px;font-size:.85rem;font-weight:600;z-index:999;animation:tIn .3s,tOut .3s 1.7s forwards;box-shadow:0 8px 24px rgba(0,0,0,.16);white-space:nowrap}
+@keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes tOut{to{opacity:0;transform:translateX(-50%) translateY(10px)}}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(–border);border-radius:99px}
+</style>
+
+</head>
+<body>
+
+<div class="tt" id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-row" id="tt-code-row">📌 <span id="tt-code"></span></div>
+  <div class="tt-row" id="tt-teacher-row">👤 <span id="tt-teacher"></span></div>
+  <div class="tt-row" id="tt-time-row">⏰ <span id="tt-time"></span></div>
+</div>
+
+<div class="app">
+<!-- TOPBAR -->
+<header class="topbar">
+  <h1>✏️ ออกแบบตารางเรียน</h1>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost" onclick="clearAll()">🗑 ล้าง</button>
+    <button class="btn btn-ghost" onclick="saveData()">💾 บันทึก</button>
+    <button class="btn btn-white" onclick="exportPNG()">🖼 Export PNG</button>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+
+<aside class="sidebar">
+
+  <!-- Add Subject -->
+
+  <div class="panel">
+    <div class="panel-title">📚 เพิ่มวิชาเรียน</div>
+    <div class="form-group">
+      <label class="form-label">ชื่อวิชา *</label>
+      <input class="form-input" id="inp-name" placeholder="เช่น คณิตศาสตร์" maxlength="40">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">รหัสวิชา</label>
+        <input class="form-input" id="inp-code" placeholder="MTH101" maxlength="12">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ผู้สอน</label>
+        <input class="form-input" id="inp-teacher" placeholder="ชื่ออาจารย์" maxlength="30">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">สี background</label>
+      <div class="color-palette" id="subj-color-palette"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">สติ๊กเกอร์</label>
+      <div class="sticker-grid" id="subj-sticker-grid"></div>
+    </div>
+    <button class="add-btn" onclick="addSubject()">+ เพิ่มวิชา</button>
+  </div>
+
+  <!-- COLOR WHEEL THEME -->
+
+  <div class="panel">
+    <div class="panel-title">🎨 ธีมสีตาราง</div>
+    <div class="wheel-container">
+
+```
+  <!-- Current preview -->
+  <div class="current-theme-preview" id="theme-preview">
+    <div class="preview-swatch" id="preview-swatch"></div>
+    <span id="preview-label">Violet Bloom</span>
+  </div>
+
+  <!-- Wheel -->
+  <div class="wheel-wrap" id="wheel-wrap">
+    <canvas id="colorWheel" width="180" height="180"></canvas>
+    <div class="wheel-pointer" id="wheel-pointer"></div>
+  </div>
+
+  <!-- Brightness -->
+  <div class="wheel-brightness" style="width:180px">
+    <label>🌑</label>
+    <input type="range" id="brightness-slider" min="30" max="100" value="82" oninput="onBrightness(this.value)">
+    <label>☀️</label>
+  </div>
+
+  <!-- Preset dots -->
+  <div class="theme-strip" id="theme-strip"></div>
+</div>
+```
+
+  </div>
+
+  <!-- Time Settings -->
+
+  <div class="panel">
+    <div class="panel-title">⚙️ ตั้งค่าตาราง</div>
+    <div class="form-label" style="margin-bottom:5px">สร้างคาบอัตโนมัติ</div>
+    <div class="form-row" style="margin-bottom:6px">
+      <div><label class="form-label">เริ่ม</label><input class="form-input" id="set-start" type="time" value="07:00"></div>
+      <div><label class="form-label">สิ้นสุด</label><input class="form-input" id="set-end" type="time" value="18:00"></div>
+    </div>
+    <div class="settings-row" style="margin-bottom:7px">
+      <span class="settings-label">ช่วงละ (นาที)</span>
+      <select class="settings-input" id="set-interval" style="width:78px">
+        <option value="30">30</option><option value="45">45</option><option value="50">50</option>
+        <option value="60" selected>60</option><option value="90">90</option><option value="100">100</option><option value="120">120</option>
+      </select>
+    </div>
+    <button class="add-btn" style="margin-bottom:0" onclick="generateSlots()">⚡ สร้างอัตโนมัติ</button>
+    <div class="section-divider"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div class="form-label" style="margin-bottom:0">📋 คาบเรียน</div>
+      <button onclick="addSlot()" style="background:none;border:1.5px solid var(--accent);color:var(--accent);border-radius:50px;padding:2px 9px;font-size:.74rem;font-weight:700;cursor:pointer">+ เพิ่ม</button>
+    </div>
+    <div id="slot-list" style="display:flex;flex-direction:column;gap:5px;max-height:185px;overflow-y:auto;padding-right:2px"></div>
+    <div class="section-divider"></div>
+    <div class="form-label" style="margin-bottom:6px">วันในตาราง</div>
+    <div class="day-checks" id="day-checks"></div>
+  </div>
+
+</aside>
+
+<!-- MAIN -->
+
+<main class="main" id="main-area">
+  <div class="timetable-wrap" id="timetable-wrap">
+    <div class="table-header-bar">
+      <input class="table-title-input" id="table-title" value="ตารางเรียนของฉัน 📖" maxlength="50">
+      <div class="semester-badge" contenteditable="true" id="semester-badge">ภาคเรียนที่ 1/2567</div>
+    </div>
+    <div class="timetable-grid-wrapper">
+      <table class="timetable" id="timetable"></table>
+    </div>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div class="stats-panel" id="stats-panel" style="display:none">
+    <div class="stats-title">📊 สรุปชั่วโมงเรียน</div>
+    <div class="stats-grid" id="stats-grid"></div>
+  </div>
+</main>
+</div>
+
+<!-- MODAL -->
+
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>📌 วางวิชาในตาราง <button class="modal-close" onclick="closeModal()">✕</button></h2>
+    <div class="form-group">
+      <label class="form-label">เลือกวิชา</label>
+      <select class="form-input" id="modal-subj-select"></select>
+    </div>
+    <div class="form-label" style="margin-bottom:5px">สติ๊กเกอร์เฉพาะช่องนี้</div>
+    <div class="modal-stickers" id="modal-stickers"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="confirmPlace()">✅ วางวิชา</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   THEME SYSTEM — 18 presets + full wheel picker
+   ========================================================= */
+const THEMES = [
+  { id:'violet',  label:'Violet Bloom',   h:270, s:75, bg:95, accent:'#7c3aed', a2:'#c084fc', top1:'#7c3aed', top2:'#f0abfc', dc:'#6d28d9', dbg:['#f3e8ff','#ede9fe'], th:'#faf5ff' },
+  { id:'indigo',  label:'Indigo Night',   h:240, s:70, bg:95, accent:'#6366f1', a2:'#a5b4fc', top1:'#4338ca', top2:'#818cf8', dc:'#3730a3', dbg:['#eef2ff','#e0e7ff'], th:'#f5f5ff' },
+  { id:'sky',     label:'Sky Breeze',     h:200, s:72, bg:95, accent:'#0ea5e9', a2:'#7dd3fc', top1:'#0284c7', top2:'#38bdf8', dc:'#0369a1', dbg:['#e0f2fe','#bae6fd'], th:'#f0f9ff' },
+  { id:'teal',    label:'Teal Wave',      h:175, s:68, bg:95, accent:'#14b8a6', a2:'#5eead4', top1:'#0f766e', top2:'#2dd4bf', dc:'#0d9488', dbg:['#ccfbf1','#99f6e4'], th:'#f0fdfa' },
+  { id:'green',   label:'Matcha Latte',   h:145, s:60, bg:95, accent:'#22c55e', a2:'#86efac', top1:'#15803d', top2:'#4ade80', dc:'#166534', dbg:['#dcfce7','#bbf7d0'], th:'#f0fdf4' },
+  { id:'lime',    label:'Lime Zest',      h:90,  s:65, bg:94, accent:'#84cc16', a2:'#bef264', top1:'#4d7c0f', top2:'#a3e635', dc:'#3f6212', dbg:['#f7fee7','#ecfccb'], th:'#f7fee7' },
+  { id:'yellow',  label:'Sunbeam',        h:47,  s:90, bg:95, accent:'#f59e0b', a2:'#fcd34d', top1:'#b45309', top2:'#fbbf24', dc:'#92400e', dbg:['#fef9c3','#fef08a'], th:'#fefce8' },
+  { id:'amber',   label:'Golden Hour',    h:35,  s:92, bg:95, accent:'#f97316', a2:'#fb923c', top1:'#c2410c', top2:'#fb923c', dc:'#9a3412', dbg:['#fff7ed','#fed7aa'], th:'#fff7ed' },
+  { id:'red',     label:'Scarlet Dusk',   h:5,   s:80, bg:95, accent:'#ef4444', a2:'#fca5a5', top1:'#b91c1c', top2:'#f87171', dc:'#991b1b', dbg:['#fff1f2','#fecdd3'], th:'#fff1f2' },
+  { id:'rose',    label:'Rose Garden',    h:345, s:78, bg:95, accent:'#fb7185', a2:'#fda4af', top1:'#be123c', top2:'#fb7185', dc:'#9f1239', dbg:['#ffe4e6','#fecdd3'], th:'#fff1f2' },
+  { id:'pink',    label:'Cotton Candy',   h:320, s:65, bg:96, accent:'#ec4899', a2:'#f9a8d4', top1:'#be185d', top2:'#f472b6', dc:'#9d174d', dbg:['#fdf2f8','#fce7f3'], th:'#fdf2f8' },
+  { id:'fuchsia', label:'Fuchsia Pop',    h:298, s:72, bg:95, accent:'#d946ef', a2:'#f0abfc', top1:'#a21caf', top2:'#e879f9', dc:'#86198f', dbg:['#fdf4ff','#fae8ff'], th:'#fdf4ff' },
+  { id:'slate',   label:'Morning Fog',    h:215, s:18, bg:96, accent:'#64748b', a2:'#94a3b8', top1:'#334155', top2:'#94a3b8', dc:'#1e293b', dbg:['#f1f5f9','#e2e8f0'], th:'#f8fafc' },
+  { id:'stone',   label:'Desert Sand',    h:28,  s:20, bg:96, accent:'#78716c', a2:'#a8a29e', top1:'#57534e', top2:'#a8a29e', dc:'#44403c', dbg:['#fafaf9','#f5f5f4'], th:'#fafaf9' },
+  { id:'peach',   label:'Peachy Keen',    h:22,  s:80, bg:96, accent:'#fb923c', a2:'#fda4af', top1:'#ea580c', top2:'#fda4af', dc:'#9a3412', dbg:['#fff7ed','#ffe4e6'], th:'#fff7ed' },
+  { id:'lavender',label:'Lavender Mist',  h:255, s:50, bg:96, accent:'#a78bfa', a2:'#c4b5fd', top1:'#6d28d9', top2:'#c4b5fd', dc:'#5b21b6', dbg:['#f5f3ff','#ede9fe'], th:'#f5f3ff' },
+  { id:'cyan',    label:'Arctic Chill',   h:188, s:75, bg:96, accent:'#06b6d4', a2:'#67e8f9', top1:'#0e7490', top2:'#22d3ee', dc:'#155e75', dbg:['#ecfeff','#cffafe'], th:'#ecfeff' },
+  { id:'emerald', label:'Emerald Isle',   h:158, s:65, bg:95, accent:'#10b981', a2:'#6ee7b7', top1:'#047857', top2:'#34d399', dc:'#065f46', dbg:['#ecfdf5','#d1fae5'], th:'#f0fdf4' },
+];
+
+let currentThemeId = 'violet';
+let brightnessVal = 82;
+let wheelDragging = false;
+
+function applyTheme(t) {
+  const r = document.documentElement.style;
+  r.setProperty('--bg',          hsl(t.h, t.s*0.2, t.bg + (brightnessVal-82)*0.06));
+  r.setProperty('--surface',     hsl(0,0,brightnessVal > 88 ? 100 : 97));
+  r.setProperty('--accent',      t.accent);
+  r.setProperty('--text',        hsl(t.h, 60, 20));
+  r.setProperty('--muted',       hsl(t.h, 35, 55));
+  r.setProperty('--border',      hsl(t.h, t.s*0.35, 88 + (brightnessVal-82)*0.04));
+  r.setProperty('--shadow',      `0 4px 24px ${hexAlpha(t.accent,0.13)}`);
+  r.setProperty('--topbar-a',    t.top1);
+  r.setProperty('--topbar-b',    t.top2);
+  r.setProperty('--day-bg',      `linear-gradient(135deg,${t.dbg[0]},${t.dbg[1]})`);
+  r.setProperty('--day-color',   t.dc);
+  r.setProperty('--th-bg',       t.th);
+  r.setProperty('--hover-cell',  hexAlpha(t.accent, 0.07));
+  r.setProperty('--drag-bg',     hexAlpha(t.accent, 0.13));
+
+  // update preview
+  document.getElementById('preview-swatch').style.background = `linear-gradient(135deg,${t.top1},${t.top2})`;
+  document.getElementById('preview-label').textContent = t.label;
+  document.getElementById('theme-preview').style.background = `linear-gradient(135deg,${t.top1},${t.top2})`;
+
+  // mark active dot
+  document.querySelectorAll('.theme-dot').forEach(d => d.classList.toggle('active', d.dataset.id === t.id));
+  currentThemeId = t.id;
+
+  // move wheel pointer
+  const angle = (t.h / 360) * Math.PI * 2 - Math.PI / 2;
+  const r2 = 74;
+  const cx = 90, cy = 90;
+  const px = cx + r2 * Math.cos(angle);
+  const py = cy + r2 * Math.sin(angle);
+  const ptr = document.getElementById('wheel-pointer');
+  ptr.style.left = px + 'px'; ptr.style.top = py + 'px';
+  ptr.style.background = t.accent;
+}
+
+function hsl(h,s,l) { return `hsl(${h},${s}%,${l}%)`; }
+function hexAlpha(hex, a) {
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function onBrightness(v) {
+  brightnessVal = parseInt(v);
+  const t = THEMES.find(t=>t.id===currentThemeId);
+  if(t) applyTheme(t);
+  saveData();
+}
+
+/* ---- Wheel canvas drawing ---- */
+function drawWheel() {
+  const canvas = document.getElementById('colorWheel');
+  const ctx = canvas.getContext('2d');
+  const cx = 90, cy = 90, r = 89;
+  for(let angle = 0; angle < 360; angle++) {
+    const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0, `hsl(${angle},0%,100%)`);
+    grad.addColorStop(0.5, `hsl(${angle},100%,70%)`);
+    grad.addColorStop(1, `hsl(${angle},100%,40%)`);
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,(angle-1)*Math.PI/180, (angle+1)*Math.PI/180);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+function wheelPickAt(x, y) {
+  const canvas = document.getElementById('colorWheel');
+  const rect = canvas.getBoundingClientRect();
+  const cx = 90, cy = 90;
+  const px = (x - rect.left) * (180/rect.width) - cx;
+  const py = (y - rect.top) * (180/rect.height) - cy;
+  const dist = Math.sqrt(px*px+py*py);
+  if(dist > 89) return;
+
+  const angle = Math.atan2(py, px) * 180 / Math.PI;
+  const h = ((angle + 360) % 360);
+  const sat = Math.min(100, (dist/89)*100);
+
+  // find closest preset, or build custom
+  let closest = THEMES[0], minD = 999;
+  THEMES.forEach(t => { const d = Math.abs(t.h - h); if(d < minD){minD=d;closest=t;} });
+
+  // snap to closest preset if within 12°
+  if(minD < 12) {
+    applyTheme(closest);
+  } else {
+    // custom derived theme
+    const light = 40 + (1-sat/100)*30;
+    const accent = `hsl(${h},${Math.round(sat)}%,${Math.round(light)}%)`;
+    const custom = {
+      id:'custom', label:'Custom', h, s:sat, bg:95,
+      accent, a2:`hsl(${h},${Math.round(sat*0.7)}%,80%)`,
+      top1:`hsl(${h},${Math.round(sat)}%,38%)`,
+      top2:`hsl(${(h+30)%360},${Math.round(sat*0.8)}%,70%)`,
+      dc:`hsl(${h},${Math.round(sat)}%,30%)`,
+      dbg:[`hsl(${h},${Math.round(sat*0.3)}%,96%)`,`hsl(${h},${Math.round(sat*0.4)}%,92%)`],
+      th:`hsl(${h},${Math.round(sat*0.2)}%,97%)`
+    };
+    applyTheme(custom);
+  }
+  saveData();
+}
+
+function buildThemeStrip() {
+  const el = document.getElementById('theme-strip');
+  el.innerHTML = THEMES.map(t => `
+    <div class="theme-dot ${t.id===currentThemeId?'active':''}" data-id="${t.id}" title="${t.label}" onclick="applyTheme(THEMES.find(x=>x.id==='${t.id}'));saveData()"
+      style="background:linear-gradient(135deg,${t.top1},${t.top2})"></div>
+  `).join('');
+}
+
+/* ---- Wheel interaction ---- */
+function setupWheel() {
+  drawWheel();
+  const canvas = document.getElementById('colorWheel');
+  canvas.addEventListener('mousedown', e => { wheelDragging = true; wheelPickAt(e.clientX, e.clientY); });
+  canvas.addEventListener('mousemove', e => { if(wheelDragging) wheelPickAt(e.clientX, e.clientY); });
+  document.addEventListener('mouseup', () => wheelDragging = false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); const t=e.touches[0]; wheelPickAt(t.clientX,t.clientY); }, {passive:false});
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); const t=e.touches[0]; wheelPickAt(t.clientX,t.clientY); }, {passive:false});
+}
+
+/* =========================================================
+   APP CONSTANTS + STATE
+   ========================================================= */
+const DAYS_ALL = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
+const COLORS = ['#f3e8ff','#fce7f3','#dbeafe','#d1fae5','#fef9c3','#ffe4e6','#e0f2fe','#f0fdf4','#fef3c7','#f5d0fe','#bfdbfe','#bbf7d0','#fda4af','#fdba74','#a5f3fc','#c4b5fd','#6ee7b7','#93c5fd'];
+const STICKERS = ['🌸','🌈','⭐','🎯','💡','🔥','🍀','🎵','📐','🧪','🎨','📖','✏️','🏆','🚀','💎','🌻','🍉','🐱','🦋','🌙','☀️','🎀','💖'];
+
+let subjects=[],cells={},customSlots=[],activeDays=[0,1,2,3,4];
+let selectedColor=COLORS[0],selectedSticker='⭐';
+let pendingCell=null,modalSticker=null,dragSrcKey=null;
+
+/* =========================================================
+   INIT
+   ========================================================= */
+function init() {
+  setupWheel();
+  loadData();
+  buildThemeStrip();
+  buildColorPalette(); buildStickerGrid(); buildDayChecks();
+  if(!customSlots.length) generateSlots();
+  else { renderSlotList(); rebuildTable(); }
+  renderLegend(); renderStats();
+  document.getElementById('table-title')?.addEventListener('input', saveData);
+  document.getElementById('semester-badge')?.addEventListener('input', saveData);
+}
+
+/* =========================================================
+   COLOR PALETTE + STICKERS
+   ========================================================= */
+function buildColorPalette() {
+  document.getElementById('subj-color-palette').innerHTML =
+    COLORS.map(c=>`<div class="color-swatch ${c===selectedColor?'active':''}" style="background:${c}" onclick="selectColor('${c}')"></div>`).join('') +
+    `<button class="custom-color-btn" onclick="document.getElementById('customColorInput').click()" title="สีเอง">+</button><input type="color" id="customColorInput" onchange="selectColor(this.value)">`;
+}
+function selectColor(c){selectedColor=c;buildColorPalette();}
+function buildStickerGrid(){
+  document.getElementById('subj-sticker-grid').innerHTML=
+    ['✖',...STICKERS].map(s=>`<span class="sticker-item ${(s==='✖'&&!selectedSticker)||s===selectedSticker?'active':''}" onclick="selectSticker('${s}')">${s}</span>`).join('');
+}
+function selectSticker(s){selectedSticker=s==='✖'?'':s;buildStickerGrid();}
+
+/* =========================================================
+   DAY CHECKS
+   ========================================================= */
+function buildDayChecks(){
+  document.getElementById('day-checks').innerHTML=DAYS_ALL.map((d,i)=>
+    `<label class="day-check-label ${activeDays.includes(i)?'checked':''}" onclick="toggleDay(${i},this)"><input type="checkbox" ${activeDays.includes(i)?'checked':''}> ${d}</label>`
+  ).join('');
+}
+function toggleDay(idx,label){
+  if(activeDays.includes(idx)){if(activeDays.length<=1)return;activeDays=activeDays.filter(d=>d!==idx);label.classList.remove('checked');}
+  else{activeDays.push(idx);activeDays.sort((a,b)=>a-b);label.classList.add('checked');}
+  rebuildTable();saveData();
+}
+
+/* =========================================================
+   TIME SLOTS
+   ========================================================= */
+function minsToTime(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function generateSlots(){
+  const s=document.getElementById('set-start').value||'07:00',e=document.getElementById('set-end').value||'18:00';
+  const iv=parseInt(document.getElementById('set-interval').value)||60;
+  const[sh,sm]=s.split(':').map(Number),[eh,em]=e.split(':').map(Number);
+  customSlots=[];
+  for(let m=sh*60+sm;m<eh*60+em;m+=iv)customSlots.push({start:minsToTime(m),end:minsToTime(m+iv)});
+  cells={};renderSlotList();rebuildTable();saveData();
+  showToast(`สร้าง ${customSlots.length} คาบเรียบร้อย ✨`);
+}
+function addSlot(){
+  const last=customSlots[customSlots.length-1];
+  let ns='07:00',ne='08:00';
+  if(last){ns=last.end;const[h,m]=last.end.split(':').map(Number);ne=minsToTime(h*60+m+60);}
+  customSlots.push({start:ns,end:ne});renderSlotList();rebuildTable();saveData();
+}
+function removeSlot(i){
+  customSlots.splice(i,1);
+  const nc={};Object.entries(cells).forEach(([k,v])=>{const[,si]=k.split('-').map(Number);if(si<customSlots.length)nc[k]=v;});cells=nc;
+  renderSlotList();rebuildTable();saveData();
+}
+function updateSlot(i,f,v){customSlots[i][f]=v;rebuildTable();saveData();}
+function renderSlotList(){
+  const el=document.getElementById('slot-list');if(!el)return;
+  if(!customSlots.length){el.innerHTML='<div style="font-size:.75rem;color:var(--muted);text-align:center;padding:7px">กด ⚡ สร้างอัตโนมัติ หรือ + เพิ่ม</div>';return;}
+  el.innerHTML=customSlots.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:4px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:4px 7px">
+      <span style="font-size:.67rem;font-weight:700;color:var(--muted);min-width:14px">${i+1}</span>
+      <input type="time" value="${s.start}" onchange="updateSlot(${i},'start',this.value)" style="border:1px solid var(--border);border-radius:6px;padding:3px 4px;font-size:.75rem;width:79px;outline:none;font-family:inherit;background:var(--bg);color:var(--text)">
+      <span style="font-size:.7rem;color:var(--muted)">–</span>
+      <input type="time" value="${s.end}" onchange="updateSlot(${i},'end',this.value)" style="border:1px solid var(--border);border-radius:6px;padding:3px 4px;font-size:.75rem;width:79px;outline:none;font-family:inherit;background:var(--bg);color:var(--text)">
+      <button onclick="removeSlot(${i})" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#e11d48;font-size:.8rem;padding:0 2px">✕</button>
+    </div>`).join('');
+}
+function getTimeSlots(){return customSlots.map(s=>({label:s.start,end:s.end,key:s.start.replace(':','')}));}
+
+/* =========================================================
+   REBUILD TABLE
+   ========================================================= */
+function rebuildTable(){
+  const slots=getTimeSlots(),days=activeDays.map(i=>DAYS_ALL[i]),tbl=document.getElementById('timetable');
+  let html='<thead><tr><th class="day-col">📅</th>';
+  slots.forEach(s=>{html+=`<th class="time-header">${s.label}<br><span style="font-size:.56rem;opacity:.6">${s.end}</span></th>`;});
+  html+='</tr></thead><tbody>';
+  days.forEach((day,di)=>{
+    html+=`<tr><th class="day-col">${day}</th>`;
+    slots.forEach((slot,si)=>{
+      const key=`${di}-${si}`,cd=cells[key];
+      if(cd){
+        const subj=subjects.find(s=>s.id===cd.subjId);
+        if(subj){
+          const sticker=cd.sticker!==undefined?cd.sticker:subj.sticker,tc=getTc(subj.color);
+          html+=`<td class="time-slot" ondragover="onDragOver(event,'${key}')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'${key}')">
+            <div class="subject-card" draggable="true" style="background:${subj.color};color:${tc}"
+              ondragstart="onDragStart(event,'${key}')" ondragend="onDragEnd(event)"
+              onmouseenter="showTip(event,'${subj.id}','${slot.label}','${slot.end}')" onmouseleave="hideTip()"
+              onclick="editCell('${key}')">
+              ${sticker?`<span class="sticker-overlay">${sticker}</span>`:''}
+              <span class="subj-code">${subj.code||''}</span>
+              <span class="subj-name">${subj.name}</span>
+              <span class="subj-teacher">${subj.teacher?'👤 '+subj.teacher:''}</span>
+              <button class="delete-cell-btn" onclick="event.stopPropagation();deleteCell('${key}')">✕</button>
+            </div></td>`;
+        }else{html+=emptyCell(di,si,key);}
+      }else{html+=emptyCell(di,si,key);}
+    });
+    html+='</tr>';
+  });
+  html+='</tbody>';tbl.innerHTML=html;renderStats();
+}
+function emptyCell(di,si,key){return `<td class="time-slot" onclick="openPlaceModal(${di},${si})" ondragover="onDragOver(event,'${key}')" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'${key}')"><div class="cell-hover-btn">＋</div></td>`;}
+function getTc(bg){const h=bg.replace('#','');if(h.length<6)return '#3b1a5a';const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return(0.299*r+0.587*g+0.114*b)/255>0.62?'#1e1a2a':'#fff';}
+
+/* =========================================================
+   DRAG AND DROP
+   ========================================================= */
+function onDragStart(e,key){dragSrcKey=key;e.dataTransfer.effectAllowed='move';setTimeout(()=>e.target.closest('.subject-card')?.classList.add('dragging'),0);}
+function onDragEnd(e){e.target.closest('.subject-card')?.classList.remove('dragging');document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));}
+function onDragOver(e,key){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over');}
+function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function onDrop(e,destKey){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  if(!dragSrcKey||dragSrcKey===destKey)return;
+  const src=cells[dragSrcKey],dest=cells[destKey];
+  if(dest)cells[dragSrcKey]=dest;else delete cells[dragSrcKey];
+  cells[destKey]=src;dragSrcKey=null;rebuildTable();saveData();showToast('ย้ายวิชาเรียบร้อย 🔀');
+}
+
+/* =========================================================
+   TOOLTIP
+   ========================================================= */
+let ttTO;
+function showTip(e,subjId,ts,te){
+  const subj=subjects.find(s=>s.id===subjId);if(!subj)return;
+  clearTimeout(ttTO);
+  ttTO=setTimeout(()=>{
+    const tt=document.getElementById('tooltip');
+    document.getElementById('tt-name').textContent=(subj.sticker||'')+' '+subj.name;
+    document.getElementById('tt-code').textContent=subj.code||'';
+    document.getElementById('tt-code-row').style.display=subj.code?'flex':'none';
+    document.getElementById('tt-teacher').textContent=subj.teacher||'';
+    document.getElementById('tt-teacher-row').style.display=subj.teacher?'flex':'none';
+    document.getElementById('tt-time').textContent=`${ts} – ${te}`;
+    const x=Math.min(e.clientX+14,window.innerWidth-228),y=Math.min(e.clientY+14,window.innerHeight-120);
+    tt.style.left=x+'px';tt.style.top=y+'px';tt.classList.add('show');
+  },200);
+}
+function hideTip(){clearTimeout(ttTO);document.getElementById('tooltip').classList.remove('show');}
+
+/* =========================================================
+   SUBJECT
+   ========================================================= */
+function addSubject(){
+  const name=document.getElementById('inp-name').value.trim();
+  if(!name){showToast('กรุณาใส่ชื่อวิชา 📚');return;}
+  subjects.push({id:'subj_'+Date.now(),name,code:document.getElementById('inp-code').value.trim(),teacher:document.getElementById('inp-teacher').value.trim(),color:selectedColor,sticker:selectedSticker});
+  document.getElementById('inp-name').value='';document.getElementById('inp-code').value='';document.getElementById('inp-teacher').value='';
+  renderLegend();saveData();showToast(`เพิ่ม "${name}" สำเร็จ! ✨`);
+}
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+function openPlaceModal(di,si){
+  if(!subjects.length){showToast('กรุณาเพิ่มวิชาก่อนนะ 📚');return;}
+  pendingCell={di,si};modalSticker=null;
+  document.getElementById('modal-subj-select').innerHTML=subjects.map(s=>`<option value="${s.id}">${s.name}${s.code?' ('+s.code+')':''}</option>`).join('');
+  document.getElementById('modal-stickers').innerHTML=['🔄',...STICKERS].map(s=>`<button class="modal-sticker-btn" onclick="setModalSticker('${s}',this)">${s}</button>`).join('');
+  document.getElementById('modal-overlay').style.display='flex';
+}
+function setModalSticker(s,el){document.querySelectorAll('.modal-sticker-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');modalSticker=s==='🔄'?undefined:s;}
+function confirmPlace(){
+  if(!pendingCell)return;
+  cells[`${pendingCell.di}-${pendingCell.si}`]={subjId:document.getElementById('modal-subj-select').value,sticker:modalSticker};
+  closeModal();rebuildTable();saveData();
+}
+function editCell(key){
+  const cd=cells[key];if(!cd)return;
+  const[di,si]=key.split('-').map(Number);pendingCell={di,si};modalSticker=cd.sticker;
+  document.getElementById('modal-subj-select').innerHTML=subjects.map(s=>`<option value="${s.id}" ${s.id===cd.subjId?'selected':''}>${s.name}${s.code?' ('+s.code+')':''}</option>`).join('');
+  document.getElementById('modal-stickers').innerHTML=['🔄',...STICKERS].map(s=>`<button class="modal-sticker-btn ${s===cd.sticker?'active':''}" onclick="setModalSticker('${s}',this)">${s}</button>`).join('');
+  document.getElementById('modal-overlay').style.display='flex';
+}
+function deleteCell(key){delete cells[key];rebuildTable();saveData();}
+function closeModal(e){if(e&&e.target!==document.getElementById('modal-overlay'))return;document.getElementById('modal-overlay').style.display='none';pendingCell=null;}
+
+/* =========================================================
+   LEGEND + STATS
+   ========================================================= */
+function renderLegend(){
+  document.getElementById('legend').innerHTML=subjects.map(s=>`
+    <div class="legend-item"><div class="legend-dot" style="background:${s.color}"></div>
+    <span>${s.sticker||''} ${s.name}${s.code?' · '+s.code:''}</span></div>`).join('');
+}
+function getSlotMins(si){const slot=customSlots[si];if(!slot)return 60;const[sh,sm]=slot.start.split(':').map(Number),[eh,em]=slot.end.split(':').map(Number);return(eh*60+em)-(sh*60+sm);}
+function renderStats(){
+  const panel=document.getElementById('stats-panel'),grid=document.getElementById('stats-grid');
+  const counts={};
+  Object.entries(cells).forEach(([k,cd])=>{if(!cd?.subjId)return;const[,si]=k.split('-').map(Number);counts[cd.subjId]=(counts[cd.subjId]||0)+getSlotMins(si);});
+  if(!Object.keys(counts).length){panel.style.display='none';return;}
+  panel.style.display='block';
+  let total=0;Object.values(counts).forEach(m=>total+=m);
+  grid.innerHTML=`<div class="stat-card stat-total"><div class="stat-subj">📊 รวมทั้งหมด</div><div class="stat-hours">${(total/60).toFixed(1)}<span style="font-size:.73rem;font-weight:400"> ชม.</span></div><div class="stat-unit">${total} นาที · ${subjects.filter(s=>counts[s.id]).length} วิชา</div></div>`+
+    subjects.filter(s=>counts[s.id]).map(s=>`<div class="stat-card"><div class="stat-subj"><div class="stat-dot" style="background:${s.color}"></div>${s.sticker||''} ${s.name}</div><div class="stat-hours">${(counts[s.id]/60).toFixed(1)}<span style="font-size:.73rem;font-weight:400"> ชม.</span></div><div class="stat-unit">${counts[s.id]} นาที · ${Math.round(counts[s.id]/total*100)}%</div></div>`).join('');
+}
+
+/* =========================================================
+   SAVE / LOAD
+   ========================================================= */
+function saveData(){
+  try{localStorage.setItem('timetable_v3',JSON.stringify({subjects,cells,customSlots,activeDays,selectedColor,selectedSticker,currentThemeId,brightnessVal,title:document.getElementById('table-title')?.value,semester:document.getElementById('semester-badge')?.textContent}));}catch(e){}
+}
+function loadData(){
+  try{
+    const raw=localStorage.getItem('timetable_v3');if(!raw)return;
+    const d=JSON.parse(raw);
+    subjects=d.subjects||[];cells=d.cells||{};customSlots=d.customSlots||[];activeDays=d.activeDays||[0,1,2,3,4];
+    selectedColor=d.selectedColor||COLORS[0];selectedSticker=d.selectedSticker||'⭐';
+    currentThemeId=d.currentThemeId||'violet';brightnessVal=d.brightnessVal||82;
+    document.getElementById('brightness-slider').value=brightnessVal;
+    const t=THEMES.find(x=>x.id===currentThemeId)||THEMES[0]; applyTheme(t);
+    if(d.title)setTimeout(()=>{const el=document.getElementById('table-title');if(el)el.value=d.title;},0);
+    if(d.semester)setTimeout(()=>{const el=document.getElementById('semester-badge');if(el)el.textContent=d.semester;},0);
+  }catch(e){}
+}
+
+/* =========================================================
+   CLEAR + EXPORT
+   ========================================================= */
+function clearAll(){
+  if(!confirm('ล้างตารางทั้งหมดหรือไม่?'))return;
+  cells={};subjects={};subjects=[];rebuildTable();renderLegend();saveData();showToast('ล้างตารางเรียบร้อยแล้ว 🗑');
+}
+async function exportPNG(){
+  showToast('กำลัง Export...');
+  try{
+    const canvas=await html2canvas(document.getElementById('timetable-wrap'),{backgroundColor:null,scale:2,useCORS:true,logging:false});
+    const a=document.createElement('a');a.download='ตารางเรียน.png';a.href=canvas.toDataURL('image/png');a.click();
+    showToast('Export PNG สำเร็จ! 🖼');
+  }catch(e){showToast('Export ไม่สำเร็จ ลองใหม่อีกครั้ง');}
+}
+
+/* =========================================================
+   TOAST
+   ========================================================= */
+function showToast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+
+/* first load: apply default theme before loadData possibly overrides */
+applyTheme(THEMES[0]);
+init();
+</script>
+
+</body>
+</html>
