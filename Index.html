@@ -73,24 +73,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .day-check-label.checked{background:var(–accent);border-color:var(–accent);color:#fff}
 .section-divider{height:1px;background:var(–border);margin:8px 0}
 
-/* ============ COLOR WHEEL PANEL ============ */
-.wheel-container{display:flex;flex-direction:column;align-items:center;gap:12px}
-.wheel-wrap{position:relative;width:180px;height:180px;cursor:pointer;flex-shrink:0}
-canvas#colorWheel{border-radius:50%;display:block;box-shadow:0 4px 18px rgba(0,0,0,0.12)}
-.wheel-pointer{position:absolute;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.28);transform:translate(-50%,-50%);pointer-events:none;transition:left .15s,top .15s}
-
-/* Theme presets strip */
-.theme-strip{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-.theme-dot{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .18s;position:relative;flex-shrink:0}
-.theme-dot:hover{transform:scale(1.18)}
-.theme-dot.active{border-color:var(–text);box-shadow:0 0 0 2px rgba(0,0,0,.18)}
-.theme-dot .theme-dot-inner{position:absolute;inset:3px;border-radius:50%}
-.wheel-brightness{display:flex;align-items:center;gap:8px;width:100%}
-.wheel-brightness label{font-size:.75rem;color:var(–muted);white-space:nowrap}
-.wheel-brightness input[type=range]{flex:1;accent-color:var(–accent);height:4px;cursor:pointer}
-.current-theme-preview{width:100%;padding:8px 12px;border-radius:12px;border:1.5px solid var(–border);background:linear-gradient(135deg,var(–topbar-a),var(–topbar-b));display:flex;align-items:center;gap:8px;color:#fff;font-size:.8rem;font-weight:600}
-.preview-swatch{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.5)}
-
 /* ===== MAIN ===== */
 .main{padding:18px 22px;overflow:auto;background:var(–bg);transition:background .35s}
 
@@ -166,6 +148,12 @@ table.timetable td.time-slot.drag-over{background:var(–drag-bg)!important;outl
 @keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes tOut{to{opacity:0;transform:translateX(-50%) translateY(10px)}}
 
+/* pattern picker */
+.pattern-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.pattern-item{height:50px;border-radius:10px;cursor:pointer;border:2.5px solid transparent;transition:all .2s;position:relative;overflow:hidden}
+.pattern-item:hover{transform:scale(1.05)}
+.pattern-item.active{border-color:var(–accent);box-shadow:0 0 0 2px rgba(0,0,0,.12)}
+.pattern-item span{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:.6rem;font-weight:600;color:rgba(0,0,0,.55);background:rgba(255,255,255,.6);padding:1px 0;border-radius:0 0 8px 8px}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(–border);border-radius:99px}
 </style>
@@ -224,37 +212,11 @@ table.timetable td.time-slot.drag-over{background:var(–drag-bg)!important;outl
     <button class="add-btn" onclick="addSubject()">+ เพิ่มวิชา</button>
   </div>
 
-  <!-- COLOR WHEEL THEME -->
+  <!-- PATTERN / THEME -->
 
   <div class="panel">
     <div class="panel-title">🎨 ธีมสีตาราง</div>
-    <div class="wheel-container">
-
-```
-  <!-- Current preview -->
-  <div class="current-theme-preview" id="theme-preview">
-    <div class="preview-swatch" id="preview-swatch"></div>
-    <span id="preview-label">Violet Bloom</span>
-  </div>
-
-  <!-- Wheel -->
-  <div class="wheel-wrap" id="wheel-wrap">
-    <canvas id="colorWheel" width="180" height="180"></canvas>
-    <div class="wheel-pointer" id="wheel-pointer"></div>
-  </div>
-
-  <!-- Brightness -->
-  <div class="wheel-brightness" style="width:180px">
-    <label>🌑</label>
-    <input type="range" id="brightness-slider" min="30" max="100" value="82" oninput="onBrightness(this.value)">
-    <label>☀️</label>
-  </div>
-
-  <!-- Preset dots -->
-  <div class="theme-strip" id="theme-strip"></div>
-</div>
-```
-
+    <div class="pattern-grid" id="pattern-grid"></div>
   </div>
 
   <!-- Time Settings -->
@@ -327,156 +289,57 @@ table.timetable td.time-slot.drag-over{background:var(–drag-bg)!important;outl
 
 <script>
 /* =========================================================
-   THEME SYSTEM — 18 presets + full wheel picker
+   PATTERNS (18 themes)
    ========================================================= */
-const THEMES = [
-  { id:'violet',  label:'Violet Bloom',   h:270, s:75, bg:95, accent:'#7c3aed', a2:'#c084fc', top1:'#7c3aed', top2:'#f0abfc', dc:'#6d28d9', dbg:['#f3e8ff','#ede9fe'], th:'#faf5ff' },
-  { id:'indigo',  label:'Indigo Night',   h:240, s:70, bg:95, accent:'#6366f1', a2:'#a5b4fc', top1:'#4338ca', top2:'#818cf8', dc:'#3730a3', dbg:['#eef2ff','#e0e7ff'], th:'#f5f5ff' },
-  { id:'sky',     label:'Sky Breeze',     h:200, s:72, bg:95, accent:'#0ea5e9', a2:'#7dd3fc', top1:'#0284c7', top2:'#38bdf8', dc:'#0369a1', dbg:['#e0f2fe','#bae6fd'], th:'#f0f9ff' },
-  { id:'teal',    label:'Teal Wave',      h:175, s:68, bg:95, accent:'#14b8a6', a2:'#5eead4', top1:'#0f766e', top2:'#2dd4bf', dc:'#0d9488', dbg:['#ccfbf1','#99f6e4'], th:'#f0fdfa' },
-  { id:'green',   label:'Matcha Latte',   h:145, s:60, bg:95, accent:'#22c55e', a2:'#86efac', top1:'#15803d', top2:'#4ade80', dc:'#166534', dbg:['#dcfce7','#bbf7d0'], th:'#f0fdf4' },
-  { id:'lime',    label:'Lime Zest',      h:90,  s:65, bg:94, accent:'#84cc16', a2:'#bef264', top1:'#4d7c0f', top2:'#a3e635', dc:'#3f6212', dbg:['#f7fee7','#ecfccb'], th:'#f7fee7' },
-  { id:'yellow',  label:'Sunbeam',        h:47,  s:90, bg:95, accent:'#f59e0b', a2:'#fcd34d', top1:'#b45309', top2:'#fbbf24', dc:'#92400e', dbg:['#fef9c3','#fef08a'], th:'#fefce8' },
-  { id:'amber',   label:'Golden Hour',    h:35,  s:92, bg:95, accent:'#f97316', a2:'#fb923c', top1:'#c2410c', top2:'#fb923c', dc:'#9a3412', dbg:['#fff7ed','#fed7aa'], th:'#fff7ed' },
-  { id:'red',     label:'Scarlet Dusk',   h:5,   s:80, bg:95, accent:'#ef4444', a2:'#fca5a5', top1:'#b91c1c', top2:'#f87171', dc:'#991b1b', dbg:['#fff1f2','#fecdd3'], th:'#fff1f2' },
-  { id:'rose',    label:'Rose Garden',    h:345, s:78, bg:95, accent:'#fb7185', a2:'#fda4af', top1:'#be123c', top2:'#fb7185', dc:'#9f1239', dbg:['#ffe4e6','#fecdd3'], th:'#fff1f2' },
-  { id:'pink',    label:'Cotton Candy',   h:320, s:65, bg:96, accent:'#ec4899', a2:'#f9a8d4', top1:'#be185d', top2:'#f472b6', dc:'#9d174d', dbg:['#fdf2f8','#fce7f3'], th:'#fdf2f8' },
-  { id:'fuchsia', label:'Fuchsia Pop',    h:298, s:72, bg:95, accent:'#d946ef', a2:'#f0abfc', top1:'#a21caf', top2:'#e879f9', dc:'#86198f', dbg:['#fdf4ff','#fae8ff'], th:'#fdf4ff' },
-  { id:'slate',   label:'Morning Fog',    h:215, s:18, bg:96, accent:'#64748b', a2:'#94a3b8', top1:'#334155', top2:'#94a3b8', dc:'#1e293b', dbg:['#f1f5f9','#e2e8f0'], th:'#f8fafc' },
-  { id:'stone',   label:'Desert Sand',    h:28,  s:20, bg:96, accent:'#78716c', a2:'#a8a29e', top1:'#57534e', top2:'#a8a29e', dc:'#44403c', dbg:['#fafaf9','#f5f5f4'], th:'#fafaf9' },
-  { id:'peach',   label:'Peachy Keen',    h:22,  s:80, bg:96, accent:'#fb923c', a2:'#fda4af', top1:'#ea580c', top2:'#fda4af', dc:'#9a3412', dbg:['#fff7ed','#ffe4e6'], th:'#fff7ed' },
-  { id:'lavender',label:'Lavender Mist',  h:255, s:50, bg:96, accent:'#a78bfa', a2:'#c4b5fd', top1:'#6d28d9', top2:'#c4b5fd', dc:'#5b21b6', dbg:['#f5f3ff','#ede9fe'], th:'#f5f3ff' },
-  { id:'cyan',    label:'Arctic Chill',   h:188, s:75, bg:96, accent:'#06b6d4', a2:'#67e8f9', top1:'#0e7490', top2:'#22d3ee', dc:'#155e75', dbg:['#ecfeff','#cffafe'], th:'#ecfeff' },
-  { id:'emerald', label:'Emerald Isle',   h:158, s:65, bg:95, accent:'#10b981', a2:'#6ee7b7', top1:'#047857', top2:'#34d399', dc:'#065f46', dbg:['#ecfdf5','#d1fae5'], th:'#f0fdf4' },
+const PATTERNS = [
+  {id:'violet',  label:'Violet',   bg:'linear-gradient(135deg,#f3e8ff,#ede9fe)', vars:{bg:'#fdf6ff',surface:'#fff',accent:'#c084fc',text:'#3b1a5a',muted:'#9d6ab8',border:'#e9d5ff',ta:'#7c3aed',tb:'#f0abfc',dc:'#6d28d9',dbg:'linear-gradient(135deg,#f3e8ff,#ede9fe)',th:'#faf5ff',hc:'rgba(192,132,252,0.08)',dr:'rgba(124,58,237,0.12)'}},
+  {id:'lavender', label:'Lavender', bg:'linear-gradient(135deg,#f5f3ff,#ede9fe)', vars:{bg:'#f5f3ff',surface:'#fff',accent:'#a78bfa',text:'#3b0764',muted:'#7c3aed',border:'#ddd6fe',ta:'#6d28d9',tb:'#c4b5fd',dc:'#5b21b6',dbg:'linear-gradient(135deg,#f5f3ff,#ede9fe)',th:'#f5f3ff',hc:'rgba(167,139,250,0.08)',dr:'rgba(109,40,217,0.12)'}},
+  {id:'indigo',  label:'Indigo',   bg:'linear-gradient(135deg,#eef2ff,#e0e7ff)', vars:{bg:'#eef2ff',surface:'#fff',accent:'#6366f1',text:'#1e1b4b',muted:'#4338ca',border:'#c7d2fe',ta:'#4338ca',tb:'#818cf8',dc:'#3730a3',dbg:'linear-gradient(135deg,#eef2ff,#e0e7ff)',th:'#f5f5ff',hc:'rgba(99,102,241,0.08)',dr:'rgba(67,56,202,0.12)'}},
+  {id:'sky',     label:'Sky',      bg:'linear-gradient(135deg,#e0f2fe,#bae6fd)', vars:{bg:'#eff6ff',surface:'#fff',accent:'#0ea5e9',text:'#0c4a6e',muted:'#0284c7',border:'#bae6fd',ta:'#0284c7',tb:'#38bdf8',dc:'#0369a1',dbg:'linear-gradient(135deg,#e0f2fe,#bae6fd)',th:'#f0f9ff',hc:'rgba(14,165,233,0.08)',dr:'rgba(2,132,199,0.12)'}},
+  {id:'cyan',    label:'Cyan',     bg:'linear-gradient(135deg,#ecfeff,#cffafe)', vars:{bg:'#ecfeff',surface:'#fff',accent:'#06b6d4',text:'#164e63',muted:'#0e7490',border:'#a5f3fc',ta:'#0e7490',tb:'#22d3ee',dc:'#155e75',dbg:'linear-gradient(135deg,#ecfeff,#cffafe)',th:'#ecfeff',hc:'rgba(6,182,212,0.08)',dr:'rgba(14,116,144,0.12)'}},
+  {id:'teal',    label:'Teal',     bg:'linear-gradient(135deg,#ccfbf1,#99f6e4)', vars:{bg:'#f0fdfa',surface:'#fff',accent:'#14b8a6',text:'#134e4a',muted:'#0f766e',border:'#99f6e4',ta:'#0f766e',tb:'#2dd4bf',dc:'#0d9488',dbg:'linear-gradient(135deg,#ccfbf1,#99f6e4)',th:'#f0fdfa',hc:'rgba(20,184,166,0.08)',dr:'rgba(15,118,110,0.12)'}},
+  {id:'emerald', label:'Emerald',  bg:'linear-gradient(135deg,#d1fae5,#a7f3d0)', vars:{bg:'#ecfdf5',surface:'#fff',accent:'#10b981',text:'#064e3b',muted:'#047857',border:'#a7f3d0',ta:'#047857',tb:'#34d399',dc:'#065f46',dbg:'linear-gradient(135deg,#d1fae5,#a7f3d0)',th:'#f0fdf4',hc:'rgba(16,185,129,0.08)',dr:'rgba(4,120,87,0.12)'}},
+  {id:'green',   label:'Green',    bg:'linear-gradient(135deg,#dcfce7,#bbf7d0)', vars:{bg:'#f0fdf4',surface:'#fff',accent:'#22c55e',text:'#14532d',muted:'#15803d',border:'#bbf7d0',ta:'#15803d',tb:'#4ade80',dc:'#166534',dbg:'linear-gradient(135deg,#dcfce7,#bbf7d0)',th:'#f0fdf4',hc:'rgba(34,197,94,0.08)',dr:'rgba(21,128,61,0.12)'}},
+  {id:'lime',    label:'Lime',     bg:'linear-gradient(135deg,#f7fee7,#ecfccb)', vars:{bg:'#f7fee7',surface:'#fff',accent:'#84cc16',text:'#365314',muted:'#4d7c0f',border:'#d9f99d',ta:'#4d7c0f',tb:'#a3e635',dc:'#3f6212',dbg:'linear-gradient(135deg,#f7fee7,#ecfccb)',th:'#f7fee7',hc:'rgba(132,204,22,0.08)',dr:'rgba(77,124,15,0.12)'}},
+  {id:'yellow',  label:'Yellow',   bg:'linear-gradient(135deg,#fef9c3,#fef08a)', vars:{bg:'#fefce8',surface:'#fff',accent:'#eab308',text:'#713f12',muted:'#a16207',border:'#fde047',ta:'#a16207',tb:'#facc15',dc:'#854d0e',dbg:'linear-gradient(135deg,#fef9c3,#fef08a)',th:'#fefce8',hc:'rgba(234,179,8,0.08)',dr:'rgba(161,98,7,0.12)'}},
+  {id:'amber',   label:'Amber',    bg:'linear-gradient(135deg,#fef3c7,#fed7aa)', vars:{bg:'#fffbeb',surface:'#fff',accent:'#f59e0b',text:'#78350f',muted:'#b45309',border:'#fcd34d',ta:'#b45309',tb:'#fbbf24',dc:'#92400e',dbg:'linear-gradient(135deg,#fef3c7,#fed7aa)',th:'#fff7ed',hc:'rgba(245,158,11,0.08)',dr:'rgba(180,83,9,0.12)'}},
+  {id:'orange',  label:'Orange',   bg:'linear-gradient(135deg,#ffedd5,#fed7aa)', vars:{bg:'#fff7ed',surface:'#fff',accent:'#f97316',text:'#7c2d12',muted:'#c2410c',border:'#fed7aa',ta:'#c2410c',tb:'#fb923c',dc:'#9a3412',dbg:'linear-gradient(135deg,#ffedd5,#fed7aa)',th:'#fff7ed',hc:'rgba(249,115,22,0.08)',dr:'rgba(194,65,12,0.12)'}},
+  {id:'peach',   label:'Peach',    bg:'linear-gradient(135deg,#ffe4e6,#fecdd3)', vars:{bg:'#fff1f2',surface:'#fff',accent:'#fb923c',text:'#881337',muted:'#e11d48',border:'#fecdd3',ta:'#e11d48',tb:'#fb923c',dc:'#9f1239',dbg:'linear-gradient(135deg,#ffe4e6,#fecdd3)',th:'#fff1f2',hc:'rgba(251,146,60,0.08)',dr:'rgba(225,29,72,0.12)'}},
+  {id:'rose',    label:'Rose',     bg:'linear-gradient(135deg,#ffe4e6,#ffc4ca)', vars:{bg:'#fff1f2',surface:'#fff',accent:'#fb7185',text:'#881337',muted:'#be123c',border:'#fecdd3',ta:'#be123c',tb:'#fb7185',dc:'#9f1239',dbg:'linear-gradient(135deg,#ffe4e6,#ffc4ca)',th:'#fff1f2',hc:'rgba(251,113,133,0.08)',dr:'rgba(190,18,60,0.12)'}},
+  {id:'pink',    label:'Pink',     bg:'linear-gradient(135deg,#fce7f3,#fbcfe8)', vars:{bg:'#fdf2f8',surface:'#fff',accent:'#ec4899',text:'#831843',muted:'#be185d',border:'#f9a8d4',ta:'#be185d',tb:'#f472b6',dc:'#9d174d',dbg:'linear-gradient(135deg,#fce7f3,#fbcfe8)',th:'#fdf2f8',hc:'rgba(236,72,153,0.08)',dr:'rgba(190,24,93,0.12)'}},
+  {id:'fuchsia', label:'Fuchsia',  bg:'linear-gradient(135deg,#fae8ff,#f5d0fe)', vars:{bg:'#fdf4ff',surface:'#fff',accent:'#d946ef',text:'#4a044e',muted:'#a21caf',border:'#f0abfc',ta:'#a21caf',tb:'#e879f9',dc:'#86198f',dbg:'linear-gradient(135deg,#fae8ff,#f5d0fe)',th:'#fdf4ff',hc:'rgba(217,70,239,0.08)',dr:'rgba(162,28,175,0.12)'}},
+  {id:'slate',   label:'Slate',    bg:'linear-gradient(135deg,#f1f5f9,#e2e8f0)', vars:{bg:'#f8fafc',surface:'#fff',accent:'#64748b',text:'#0f172a',muted:'#475569',border:'#cbd5e1',ta:'#334155',tb:'#94a3b8',dc:'#1e293b',dbg:'linear-gradient(135deg,#f1f5f9,#e2e8f0)',th:'#f8fafc',hc:'rgba(100,116,139,0.08)',dr:'rgba(51,65,85,0.12)'}},
+  {id:'stone',   label:'Stone',    bg:'linear-gradient(135deg,#f5f5f4,#e7e5e4)', vars:{bg:'#fafaf9',surface:'#fff',accent:'#78716c',text:'#1c1917',muted:'#57534e',border:'#d6d3d1',ta:'#57534e',tb:'#a8a29e',dc:'#44403c',dbg:'linear-gradient(135deg,#f5f5f4,#e7e5e4)',th:'#fafaf9',hc:'rgba(120,113,108,0.08)',dr:'rgba(87,83,78,0.12)'}},
 ];
 
-let currentThemeId = 'violet';
-let brightnessVal = 82;
-let wheelDragging = false;
+let currentPatternId = 'violet';
 
-function applyTheme(t) {
-  const r = document.documentElement.style;
-  r.setProperty('--bg',          hsl(t.h, t.s*0.2, t.bg + (brightnessVal-82)*0.06));
-  r.setProperty('--surface',     hsl(0,0,brightnessVal > 88 ? 100 : 97));
-  r.setProperty('--accent',      t.accent);
-  r.setProperty('--text',        hsl(t.h, 60, 20));
-  r.setProperty('--muted',       hsl(t.h, 35, 55));
-  r.setProperty('--border',      hsl(t.h, t.s*0.35, 88 + (brightnessVal-82)*0.04));
-  r.setProperty('--shadow',      `0 4px 24px ${hexAlpha(t.accent,0.13)}`);
-  r.setProperty('--topbar-a',    t.top1);
-  r.setProperty('--topbar-b',    t.top2);
-  r.setProperty('--day-bg',      `linear-gradient(135deg,${t.dbg[0]},${t.dbg[1]})`);
-  r.setProperty('--day-color',   t.dc);
-  r.setProperty('--th-bg',       t.th);
-  r.setProperty('--hover-cell',  hexAlpha(t.accent, 0.07));
-  r.setProperty('--drag-bg',     hexAlpha(t.accent, 0.13));
-
-  // update preview
-  document.getElementById('preview-swatch').style.background = `linear-gradient(135deg,${t.top1},${t.top2})`;
-  document.getElementById('preview-label').textContent = t.label;
-  document.getElementById('theme-preview').style.background = `linear-gradient(135deg,${t.top1},${t.top2})`;
-
-  // mark active dot
-  document.querySelectorAll('.theme-dot').forEach(d => d.classList.toggle('active', d.dataset.id === t.id));
-  currentThemeId = t.id;
-
-  // move wheel pointer
-  const angle = (t.h / 360) * Math.PI * 2 - Math.PI / 2;
-  const r2 = 74;
-  const cx = 90, cy = 90;
-  const px = cx + r2 * Math.cos(angle);
-  const py = cy + r2 * Math.sin(angle);
-  const ptr = document.getElementById('wheel-pointer');
-  ptr.style.left = px + 'px'; ptr.style.top = py + 'px';
-  ptr.style.background = t.accent;
+function applyTheme(p) {
+  const v = p.vars, r = document.documentElement.style;
+  r.setProperty('--bg', v.bg);
+  r.setProperty('--surface', v.surface);
+  r.setProperty('--accent', v.accent);
+  r.setProperty('--text', v.text);
+  r.setProperty('--muted', v.muted);
+  r.setProperty('--border', v.border);
+  r.setProperty('--shadow', `0 4px 24px ${v.accent}22`);
+  r.setProperty('--topbar-a', v.ta);
+  r.setProperty('--topbar-b', v.tb);
+  r.setProperty('--day-bg', v.dbg);
+  r.setProperty('--day-color', v.dc);
+  r.setProperty('--th-bg', v.th);
+  r.setProperty('--hover-cell', v.hc);
+  r.setProperty('--drag-bg', v.dr);
+  currentPatternId = p.id;
+  buildPatternGrid();
 }
 
-function hsl(h,s,l) { return `hsl(${h},${s}%,${l}%)`; }
-function hexAlpha(hex, a) {
-  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-function onBrightness(v) {
-  brightnessVal = parseInt(v);
-  const t = THEMES.find(t=>t.id===currentThemeId);
-  if(t) applyTheme(t);
-  saveData();
-}
-
-/* ---- Wheel canvas drawing ---- */
-function drawWheel() {
-  const canvas = document.getElementById('colorWheel');
-  const ctx = canvas.getContext('2d');
-  const cx = 90, cy = 90, r = 89;
-  for(let angle = 0; angle < 360; angle++) {
-    const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
-    grad.addColorStop(0, `hsl(${angle},0%,100%)`);
-    grad.addColorStop(0.5, `hsl(${angle},100%,70%)`);
-    grad.addColorStop(1, `hsl(${angle},100%,40%)`);
-    ctx.beginPath();
-    ctx.moveTo(cx,cy);
-    ctx.arc(cx,cy,r,(angle-1)*Math.PI/180, (angle+1)*Math.PI/180);
-    ctx.fillStyle = grad;
-    ctx.fill();
-  }
-}
-
-function wheelPickAt(x, y) {
-  const canvas = document.getElementById('colorWheel');
-  const rect = canvas.getBoundingClientRect();
-  const cx = 90, cy = 90;
-  const px = (x - rect.left) * (180/rect.width) - cx;
-  const py = (y - rect.top) * (180/rect.height) - cy;
-  const dist = Math.sqrt(px*px+py*py);
-  if(dist > 89) return;
-
-  const angle = Math.atan2(py, px) * 180 / Math.PI;
-  const h = ((angle + 360) % 360);
-  const sat = Math.min(100, (dist/89)*100);
-
-  // find closest preset, or build custom
-  let closest = THEMES[0], minD = 999;
-  THEMES.forEach(t => { const d = Math.abs(t.h - h); if(d < minD){minD=d;closest=t;} });
-
-  // snap to closest preset if within 12°
-  if(minD < 12) {
-    applyTheme(closest);
-  } else {
-    // custom derived theme
-    const light = 40 + (1-sat/100)*30;
-    const accent = `hsl(${h},${Math.round(sat)}%,${Math.round(light)}%)`;
-    const custom = {
-      id:'custom', label:'Custom', h, s:sat, bg:95,
-      accent, a2:`hsl(${h},${Math.round(sat*0.7)}%,80%)`,
-      top1:`hsl(${h},${Math.round(sat)}%,38%)`,
-      top2:`hsl(${(h+30)%360},${Math.round(sat*0.8)}%,70%)`,
-      dc:`hsl(${h},${Math.round(sat)}%,30%)`,
-      dbg:[`hsl(${h},${Math.round(sat*0.3)}%,96%)`,`hsl(${h},${Math.round(sat*0.4)}%,92%)`],
-      th:`hsl(${h},${Math.round(sat*0.2)}%,97%)`
-    };
-    applyTheme(custom);
-  }
-  saveData();
-}
-
-function buildThemeStrip() {
-  const el = document.getElementById('theme-strip');
-  el.innerHTML = THEMES.map(t => `
-    <div class="theme-dot ${t.id===currentThemeId?'active':''}" data-id="${t.id}" title="${t.label}" onclick="applyTheme(THEMES.find(x=>x.id==='${t.id}'));saveData()"
-      style="background:linear-gradient(135deg,${t.top1},${t.top2})"></div>
-  `).join('');
-}
-
-/* ---- Wheel interaction ---- */
-function setupWheel() {
-  drawWheel();
-  const canvas = document.getElementById('colorWheel');
-  canvas.addEventListener('mousedown', e => { wheelDragging = true; wheelPickAt(e.clientX, e.clientY); });
-  canvas.addEventListener('mousemove', e => { if(wheelDragging) wheelPickAt(e.clientX, e.clientY); });
-  document.addEventListener('mouseup', () => wheelDragging = false);
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); const t=e.touches[0]; wheelPickAt(t.clientX,t.clientY); }, {passive:false});
-  canvas.addEventListener('touchmove',  e => { e.preventDefault(); const t=e.touches[0]; wheelPickAt(t.clientX,t.clientY); }, {passive:false});
+function buildPatternGrid() {
+  const el = document.getElementById('pattern-grid');
+  if (!el) return;
+  el.innerHTML = PATTERNS.map(p =>
+    `<div class="pattern-item ${p.id===currentPatternId?'active':''}" style="${p.bg}" onclick="applyTheme(PATTERNS.find(x=>x.id==='${p.id}'));saveData()" title="${p.label}"><span>${p.label}</span></div>`
+  ).join('');
 }
 
 /* =========================================================
@@ -493,13 +356,47 @@ let pendingCell=null,modalSticker=null,dragSrcKey=null;
 /* =========================================================
    INIT
    ========================================================= */
+function loadDefaultData() {
+  // Sample subjects
+  const s = [
+    {id:'s1', name:'คณิตศาสตร์',  code:'MTH101', teacher:'อ.สมชาย',  color:'#dbeafe', sticker:'📐'},
+    {id:'s2', name:'ภาษาอังกฤษ',  code:'ENG201', teacher:'อ.จอห์น',   color:'#d1fae5', sticker:'📖'},
+    {id:'s3', name:'วิทยาศาสตร์', code:'SCI102', teacher:'อ.สมหญิง', color:'#fef9c3', sticker:'🧪'},
+    {id:'s4', name:'ภาษาไทย',     code:'THA103', teacher:'อ.มาลี',   color:'#fce7f3', sticker:'✏️'},
+    {id:'s5', name:'สังคมศึกษา',  code:'SOC104', teacher:'อ.วิชัย',  color:'#ffe4e6', sticker:'🌏'},
+    {id:'s6', name:'พลศึกษา',     code:'PE105',  teacher:'อ.บวร',    color:'#d1fae5', sticker:'🏆'},
+    {id:'s7', name:'ศิลปะ',       code:'ART106', teacher:'อ.นิดา',   color:'#f5d0fe', sticker:'🎨'},
+    {id:'s8', name:'คอมพิวเตอร์', code:'COM107', teacher:'อ.เดช',    color:'#e0f2fe', sticker:'🚀'},
+  ];
+  subjects = s;
+
+  // Sample cells: [dayIdx, slotIdx] → subjId
+  // Days: 0=จ 1=อ 2=พ 3=พฤ 4=ศ  |  Slots based on 8:00–16:00 60min = slots 0-7 (if start=07:00: 07=0,08=1,09=2,10=3,11=4,12=5,13=6,14=7,15=8)
+  const placements = [
+    [0,1,'s1'],[0,3,'s3'],[0,5,'s7'],
+    [1,1,'s2'],[1,3,'s4'],[1,6,'s8'],
+    [2,1,'s1'],[2,3,'s5'],[2,5,'s3'],
+    [3,2,'s2'],[3,4,'s6'],[3,6,'s4'],
+    [4,1,'s3'],[4,3,'s1'],[4,5,'s8'],
+  ];
+  cells = {};
+  placements.forEach(([di,si,sid]) => { cells[di+'-'+si] = {subjId:sid, sticker:undefined}; });
+}
+
 function init() {
-  setupWheel();
   loadData();
-  buildThemeStrip();
+  const hasData = localStorage.getItem('timetable_v3');
+  buildPatternGrid();
   buildColorPalette(); buildStickerGrid(); buildDayChecks();
-  if(!customSlots.length) generateSlots();
-  else { renderSlotList(); rebuildTable(); }
+  if(!customSlots.length) {
+    // Build default 07:00-18:00 60min slots silently
+    for(let m=7*60;m<18*60;m+=60) customSlots.push({start:minsToTime(m),end:minsToTime(m+60)});
+    renderSlotList();
+    if(!hasData) loadDefaultData();
+    rebuildTable();
+  } else {
+    renderSlotList(); rebuildTable();
+  }
   renderLegend(); renderStats();
   document.getElementById('table-title')?.addEventListener('input', saveData);
   document.getElementById('semester-badge')?.addEventListener('input', saveData);
@@ -707,7 +604,7 @@ function renderStats(){
    SAVE / LOAD
    ========================================================= */
 function saveData(){
-  try{localStorage.setItem('timetable_v3',JSON.stringify({subjects,cells,customSlots,activeDays,selectedColor,selectedSticker,currentThemeId,brightnessVal,title:document.getElementById('table-title')?.value,semester:document.getElementById('semester-badge')?.textContent}));}catch(e){}
+  try{localStorage.setItem('timetable_v3',JSON.stringify({subjects,cells,customSlots,activeDays,selectedColor,selectedSticker,currentPatternId,title:document.getElementById('table-title')?.value,semester:document.getElementById('semester-badge')?.textContent}));}catch(e){}
 }
 function loadData(){
   try{
@@ -715,9 +612,8 @@ function loadData(){
     const d=JSON.parse(raw);
     subjects=d.subjects||[];cells=d.cells||{};customSlots=d.customSlots||[];activeDays=d.activeDays||[0,1,2,3,4];
     selectedColor=d.selectedColor||COLORS[0];selectedSticker=d.selectedSticker||'⭐';
-    currentThemeId=d.currentThemeId||'violet';brightnessVal=d.brightnessVal||82;
-    document.getElementById('brightness-slider').value=brightnessVal;
-    const t=THEMES.find(x=>x.id===currentThemeId)||THEMES[0]; applyTheme(t);
+    currentPatternId=d.currentPatternId||d.currentThemeId||'violet';
+    const t=PATTERNS.find(x=>x.id===currentPatternId)||PATTERNS[0]; applyTheme(t);
     if(d.title)setTimeout(()=>{const el=document.getElementById('table-title');if(el)el.value=d.title;},0);
     if(d.semester)setTimeout(()=>{const el=document.getElementById('semester-badge');if(el)el.textContent=d.semester;},0);
   }catch(e){}
@@ -744,8 +640,6 @@ async function exportPNG(){
    ========================================================= */
 function showToast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
 
-/* first load: apply default theme before loadData possibly overrides */
-applyTheme(THEMES[0]);
 init();
 </script>
 
